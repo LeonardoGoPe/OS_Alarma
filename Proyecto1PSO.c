@@ -49,12 +49,27 @@ struct valoresSensores{
 	int estado;
 };
 
-struct mesg_buffer { 
+struct mesg_buffer { /*Buffer para IPC entre sensores y calculos()*/
 	long tipoMensaje; 
 	char textoMensaje[512]; 
 } mensaje; 
 
-struct mesg_buffer_end { 
+struct mesg_bufferA { /*Buffer para IPC de la opción A*/
+	long tipoMensaje; 
+	char textoMensaje[512]; 
+} mensajeA; 
+
+struct mesg_bufferB { /*Buffer para IPC de la opción B*/
+	long tipoMensaje; 
+	char textoMensaje[512]; 
+} mensajeB; 
+
+struct mesg_bufferC { /*Buffer para IPC de la opción C*/
+	long tipoMensaje; 
+	char textoMensaje[512]; 
+} mensajeC; 
+
+struct mesg_buffer_end { /*Buffer para IPC para almacenar valores en calculos()*/
 	long tipoMensaje; 
 	char textoMensaje[512]; 
 } mensajeRecibido; 
@@ -95,10 +110,10 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 	int i = *(int *) arg;
 	int comm = memCompartidaInicial+i;
 	char commC[8];
-	int shmid,*shm;
-	
-	int shmidRes;
-	int *shmRes, *s;
+	int shmid,*shm=0;
+
+	int shmidA, *shmA;
+	int validacionA = 1;
 
 	int sumatoria, contador;
 
@@ -127,6 +142,32 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 			close(shmid);
 			break;
 		}
+
+		/*Cola de mensajes para opción A*/
+		if ((shmidA = shmget(7788, SHMSZ,  0666)) < 0) {
+			perror("shmget");
+			return(1);
+		}
+		if ((shmA = shmat(shmidA, NULL, 0)) == (int *) -1) {
+			perror("shmat");
+			return(1);
+		}
+		if(*shmA==1){
+			char valor[5];
+			key_t keyA; 
+			int msgidA; 
+			keyA = ftok("proyectoA", 102);
+			msgidA = msgget(keyA, 0666 | IPC_CREAT);
+			mensajeA.tipoMensaje = 1;
+			sprintf(valor,"%d",*shm);
+			strcat(mensajeA.textoMensaje,"Dato recibido: ");
+			strcat(mensajeA.textoMensaje,valor);
+			strcat(mensajeA.textoMensaje," del sensor");
+			strcat(mensajeA.textoMensaje,argId);
+			msgsnd(msgidA, &mensajeA, sizeof(mensajeA), 0);
+			strcpy(mensajeA.textoMensaje,"");
+		}
+		
 		datosCalculos.valores[contador]=*shm;
 		sumatoria += *shm;
 		contador++;
@@ -156,7 +197,7 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 			sprintf(thresholdSensor,"%d",argTh);
 			sprintf(estadoSensor,"%d",estado);
  
-			/*Creacion de la cola de mensajes*/
+			/*Cola de mensajes*/
 			key_t key; 
 			int msgid; 
 			key = ftok("proyecto", 101);
@@ -177,7 +218,7 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 			strcat(mensaje.textoMensaje,estadoSensor);
 
 			msgsnd(msgid, &mensaje, sizeof(mensaje), 0);
-			printf("Dato enviados de sensores: %s \n", mensaje.textoMensaje);
+			//printf("Dato enviados de sensores: %s \n", mensaje.textoMensaje);
 
 			sumatoria = 0;
 			contador = 0;
@@ -206,7 +247,7 @@ void calculos(int sensoresIngresados){
 	key_t key; 
 	int msgid; 
 
-	// ftok to generate unique key 
+	// ftok para generar una unica llave
 	key = ftok("proyecto", 101); 
 
 	// msgget creates a message queue 
@@ -294,6 +335,7 @@ void calculos(int sensoresIngresados){
 	}else{
 		senCoop = (float)isSenCoop/(float)numSenCoop;
 	}
+
 	printf("Sensor 1 -- Id: %d, Media: %0.2f, Varianza: %0.2f, Threshold: %d, Encendido: %d\n",s1.id,s1.media,s1.varianza,s1.threshold,s1.encendida);
 	printf("Sensor 2 -- Id: %d, Media: %0.2f, Varianza: %0.2f, Threshold: %d, Encendido: %d\n",s2.id,s2.media,s2.varianza,s2.threshold,s2.encendida);
 	printf("Sensor 3 -- Id: %d, Media: %0.2f, Varianza: %0.2f, Threshold: %d, Encendido: %d\n",s3.id,s3.media,s3.varianza,s3.threshold,s3.encendida);
@@ -303,6 +345,45 @@ void calculos(int sensoresIngresados){
 		printf("Alarma encendida!\n\n");
 	}else{
 		printf("Alarma apagada!\n\n");
+	}
+	/*Cola de mensajes para opción B*/
+	int shmidB, *shmB;
+	if ((shmidB = shmget(7799, SHMSZ,  0666)) < 0) {
+		perror("shmget");
+		return(1);
+	}
+	if ((shmB = shmat(shmidB, NULL, 0)) == (int *) -1) {
+		perror("shmat");
+		return(1);
+	}
+	if(*shmB==1){
+		key_t keyB; 
+		int msgidB; 
+		keyB = ftok("proyectoB", 103);
+		msgidB = msgget(keyB, 0666 | IPC_CREAT);
+		mensajeB.tipoMensaje = 1;
+		if(s1.encendida){
+			strcat(mensajeB.textoMensaje,"Sensor 1 cumple\n");
+		}else{strcat(mensajeB.textoMensaje,"Sensor 1 no cumple\n");}
+		if(s2.encendida){
+			strcat(mensajeB.textoMensaje,"Sensor 2 cumple\n");
+		}else{strcat(mensajeB.textoMensaje,"Sensor 2 no cumple\n");}
+		if(s3.encendida){
+			strcat(mensajeB.textoMensaje,"Sensor 3 cumple\n");
+		}else{strcat(mensajeB.textoMensaje,"Sensor 3 no cumple\n");}
+		if(s4.encendida){
+			strcat(mensajeB.textoMensaje,"Sensor 4 cumple\n");
+		}else{strcat(mensajeB.textoMensaje,"Sensor 4 no cumple\n");}
+		if(((float)senCoop > 0.5)){
+			strcat(mensajeB.textoMensaje,"Sensores cooperativos cumplen\n");
+		}else{strcat(mensajeB.textoMensaje,"Sensores cooperativos no cumplen\n");}
+		if(s1.encendida && s2.encendida && s3.encendida && s4.encendida && ((float)senCoop > 0.5)){
+			strcat(mensajeB.textoMensaje,"Alarma encendida\n");
+		}else{
+			strcat(mensajeB.textoMensaje,"Alarma apagada\n");
+		}
+		msgsnd(msgidB, &mensajeB, sizeof(mensajeB), 0);
+		strcpy(mensajeB.textoMensaje,"");
 	}	
 	// to destroy the message queue 
 	msgctl(msgid, IPC_RMID, NULL); 
@@ -314,7 +395,43 @@ int main(int argc, char *argv[]){
 	if (argc != 3){ 
         	printf("Ingrese solo 2 argumentos Ej: ./proyecto 10 archivo.txt\n"); 
         	return 0; 
-    	} 
+    	}
+
+	/*Memoria compartida para opcion A*/
+	int shmidA,*shmA;
+	if ((shmidA = shmget(7788, SHMSZ, IPC_CREAT | 0666)) < 0) {
+		perror("shmget");
+		return(1);
+	}
+	if ((shmA = shmat(shmidA, NULL, 0)) == (int *) -1) {
+		perror("shmat");
+		return(1);
+	}
+	*shmA=0;
+
+	/*Memoria compartida para opcion B*/
+	int shmidB,*shmB;
+	if ((shmidB = shmget(7799, SHMSZ, IPC_CREAT | 0666)) < 0) {
+		perror("shmget");
+		return(1);
+	}
+	if ((shmB = shmat(shmidB, NULL, 0)) == (int *) -1) {
+		perror("shmat");
+		return(1);
+	}
+	*shmB=0;
+
+	/*Memoria compartida para opcion C*/
+	int shmidC,*shmC;
+	if ((shmidC = shmget(7700, SHMSZ, IPC_CREAT | 0666)) < 0) {
+		perror("shmget");
+		return(1);
+	}
+	if ((shmC = shmat(shmidC, NULL, 0)) == (int *) -1) {
+		perror("shmat");
+		return(1);
+	}
+	*shmC=0;
 
 	int tiempo = atoi(argv[1]);
 	char *archivo = argv[2];
