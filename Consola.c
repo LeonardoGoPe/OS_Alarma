@@ -28,6 +28,11 @@ struct mesg_bufferB {
 	char textoMensaje[512]; 
 } mensajeB; 
 
+struct mesg_bufferC { 
+	long tipoMensaje; 
+	char textoMensaje[512]; 
+} mensajeC; 
+
 int commA = 7788;
 int commB = 7799;
 int commC = 7700;
@@ -35,13 +40,13 @@ int commC = 7700;
 int main(int argc, char *argv[]){
 	while(1){
 		int ch;
-		initscr();			/* Start curses mode 		*/
-		raw();				/* Line buffering disabled	*/
-		keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
-		noecho();			/* Don't echo() while we do getch */
+		initscr();			
+		raw();				
+		keypad(stdscr, TRUE);		
+		noecho();			
 		scrollok(stdscr, TRUE);
 		cbreak();
-		printw("********Seleccione la opción que desea ejecutar********\n");
+		printw("\n********Seleccione la opción que desea ejecutar********\n");
 		printw("A) Datos que llegan desde cada uno de los sensores\n");
 		printw("B) Reglas que se cumplen y el estado de la alarma\n");
 		printw("C) Ver información de diagnóstico de sensor\n");
@@ -75,12 +80,10 @@ int main(int argc, char *argv[]){
 				key_t key; 
 				int msgid; 
 
-				// ftok para generar una unica llave
-				key = ftok("proyectoA", 102); 
+				key = ftok("proyectoA", 102); /*ftok para generar una unica llave*/
 
-				// msgget creates a message queue 
-				// and returns identifier 
-				msgid = msgget(key, 0666 | IPC_CREAT); 
+				
+				msgid = msgget(key, 0666 | IPC_CREAT); /*msgget crear cola de mensajes y regresar identificador*/
 				for(int k = 0; k<=9;k++){
 					msgrcv(msgid, &mensajeA, sizeof(mensajeA), 1, 0);
 					printw("%s \n",mensajeA.textoMensaje);
@@ -90,17 +93,15 @@ int main(int argc, char *argv[]){
 					*shm=0;
 					opcionA=false;
 				}
-				refresh();			/* Print it on to the real screen */
-
-				// to destroy the message queue 
-				msgctl(msgid, IPC_RMID, NULL);
+				refresh();			/* Actualizar pantalla */
+				msgctl(msgid, IPC_RMID, NULL);  /* Eliminar cola de mensajes*/
 			}
 			close(shmid);
 
 		}else if(ch==98){
 			bool opcionB = true;
 			printw("Seleccionó la opción B, presione *Enter* para ejecutar o X para salir\n");
-			/*Memoria compartida para validar opcion A*/
+			/*Memoria compartida para validar opcion B*/
 			int shmidB,*shmB;
 			if ((shmidB = shmget(commB, SHMSZ, IPC_CREAT | 0666)) < 0) {
 				perror("shmget");
@@ -122,12 +123,9 @@ int main(int argc, char *argv[]){
 				key_t keyB; 
 				int msgidB; 
 
-				// ftok para generar una unica llave
-				keyB = ftok("proyectoB", 103); 
+				keyB = ftok("proyectoB", 103); /*ftok para generar una unica llave*/
 
-				// msgget creates a message queue 
-				// and returns identifier 
-				msgidB = msgget(keyB, 0666 | IPC_CREAT); 
+				msgidB=msgget(keyB, 0666 | IPC_CREAT);/*msgget crear cola de mensajes y regresar identificador*/
 				msgrcv(msgidB, &mensajeB, sizeof(mensajeB), 1, 0);
 				printw("%s \n",mensajeB.textoMensaje);
 				if (getch() == 'x') {
@@ -135,30 +133,61 @@ int main(int argc, char *argv[]){
 					*shmB=0;
 					opcionB=false;
 				}
-				refresh();			/* Print it on to the real screen */
-
-				// to destroy the message queue 
-				msgctl(msgidB, IPC_RMID, NULL);
+				refresh();			/* Actualizar pantalla */
+				msgctl(msgidB, IPC_RMID, NULL); /* Eliminar cola de mensajes*/
 			}
 			close(shmidB);
 			
 		}else if(ch==99){
-			printw("Usted seleccionó la opción C\n");
-			nodelay(stdscr, TRUE); /* Para ejecutar sin interrupciones */
+			bool opcionC = true;
+			printw("Seleccionó la opción C, presione *Enter* para ejecutar o X para salir\n");
+			/*Memoria compartida para validar opcion C*/
+			int shmidC,*shmC;
+			if ((shmidC = shmget(commC, SHMSZ, IPC_CREAT | 0666)) < 0) {
+				perror("shmget");
+				return(1);
+			}
+			if ((shmC = shmat(shmidC, NULL, 0)) == (int *) -1) {
+				perror("shmat");
+				return(1);
+			}
 			if (getch() == 'x') {
 				printw("Usted ha presionado X, presione *Enter* para salir\n");
+				*shmC=0;
+				opcionC=false;
 			}
+			*shmC=1;
 			refresh();
+			while(opcionC){
+				nodelay(stdscr, TRUE); /* Para ejecutar sin interrupciones */
+				key_t key; 
+				int msgid; 
+				key = ftok("proyectoC", 104); /*ftok para generar una unica llave*/
+				msgid=msgget(key, 0666 | IPC_CREAT); /*msgget crear cola de mensajes y regresar identificador*/
+				
+				for(int k = 0; k<=9;k++){
+					msgrcv(msgid, &mensajeC, sizeof(mensajeC), 1, 0);
+					printw("%s \n",mensajeC.textoMensaje);
+				}
+				if (getch() == 'x') {
+					printw("Usted ha presionado X, presione *Enter* para salir\n");
+					*shmC=0;
+					opcionC=false;
+				}
+				refresh();			/* Actualizar pantalla */
+				msgctl(msgid, IPC_RMID, NULL); /* Eliminar cola de mensajes*/
+			}
+			close(shmidC);
 		}else if(ch==100){
-			endwin();			/* End curses mode		  */
+			endwin();			/* Salir de modo curses */
 			return 0;
 		}else{
 			printf("Opcion inválida\n");
 		}
 		nodelay(stdscr, FALSE);
-		refresh();			/* Print it on to the real screen */
-	    	getch();			/* Wait for user input */
-		endwin();			/* End curses mode		  */
+		refresh();			/* Actualizar pantalla */
+	    	getch();			/* Esperar por ingreso de usuario */
+		endwin();			/* Salir de modo curses */
 	}
 	return 0;
 

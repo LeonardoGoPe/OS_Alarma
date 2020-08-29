@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <math.h>
 #include <sys/msg.h> 
+#include <time.h>
 
                                                           
 #define SIZE 50
@@ -76,6 +77,8 @@ struct mesg_buffer_end { /*Buffer para IPC para almacenar valores en calculos()*
 
 int memCompartidaInicial = 2345; /*Primera dirección desde donde se compartirá memoria. Los demás sensores compartirán la siguiente*/
 
+int contadorC;
+
 /*Metodo para crear procesos indicados en el archivo*/
 void creacionSensores(void *arg, char *argId, char *argTipoSensor){ 
 	int i = *(int *) arg;
@@ -113,6 +116,7 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 	int shmid,*shm=0;
 
 	int shmidA, *shmA;
+	int shmidC, *shmC;
 	int validacionA = 1;
 
 	int sumatoria, contador;
@@ -123,6 +127,9 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 	char varianzaSensor[16];
 	char thresholdSensor[16];
 	char estadoSensor[5];
+
+	time_t t = time(NULL);
+  	struct tm tm = *localtime(&t);
 
 	sprintf(commC,"%d",comm);
 	datosCalculos.id=atoi(argId);
@@ -166,6 +173,58 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 			strcat(mensajeA.textoMensaje,argId);
 			msgsnd(msgidA, &mensajeA, sizeof(mensajeA), 0);
 			strcpy(mensajeA.textoMensaje,"");
+		}
+
+		/*Cola de mensajes para opción C*/
+		if ((shmidC = shmget(7700, SHMSZ,  0666)) < 0) {
+			perror("shmget");
+			return(1);
+		}
+		if ((shmC = shmat(shmidC, NULL, 0)) == (int *) -1) {
+			perror("shmat");
+			return(1);
+		}
+		if(*shmC==1){
+			char anioC[5];
+			char mesC[5];
+			char diaC[5];
+			char idPro[5];
+			int controlValor;
+			if(*shm!=controlValor){
+				controlValor=*shm;
+				contadorC = 0;
+			}else{
+				contadorC++;
+			}
+			controlValor = *shm;
+			time_t t = time(NULL);
+  			struct tm tm = *localtime(&t);
+			key_t keyC; 
+			int msgidC; 
+			keyC = ftok("proyectoC", 104);
+			msgidC = msgget(keyC, 0666 | IPC_CREAT);
+			mensajeC.tipoMensaje = 1;
+			strcat(mensajeC.textoMensaje,"Sensor ");
+			strcat(mensajeC.textoMensaje,argId);
+			if(contadorC<5){
+				strcat(mensajeC.textoMensaje," -- Activo --");
+			}else{
+				strcat(mensajeC.textoMensaje," -- Inactivo --");
+			}
+			int anio = tm.tm_year + 1900, mes = tm.tm_mon + 1, dia = tm.tm_mday;
+			sprintf(anioC,"%d",anio);
+			sprintf(mesC,"%d",mes);
+			sprintf(diaC,"%d",dia);
+			sprintf(idPro,"%d",getpid());
+			strcat(mensajeC.textoMensaje,idPro);
+			strcat(mensajeC.textoMensaje,"-- ");
+			strcat(mensajeC.textoMensaje,anioC);
+			strcat(mensajeC.textoMensaje,"-");
+			strcat(mensajeC.textoMensaje,mesC);
+			strcat(mensajeC.textoMensaje,"-");
+			strcat(mensajeC.textoMensaje,diaC);
+			msgsnd(msgidC, &mensajeC, sizeof(mensajeC), 0);
+			strcpy(mensajeC.textoMensaje,"");
 		}
 		
 		datosCalculos.valores[contador]=*shm;
