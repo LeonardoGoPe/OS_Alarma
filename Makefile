@@ -1,3 +1,4 @@
 all:
-	gcc -o sx sensorx.c
+	gcc -o sensorx sensorx.c
 	gcc -o proyecto Proyecto1PSO.c -lm
+	gcc -o consola Consola.c -lncurses

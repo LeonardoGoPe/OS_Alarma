@@ -23,6 +23,7 @@ struct formato{
 	char *id;
 	char *tipoSensor;
 	int threshold;
+	int puerto;
 };
 
 struct Tiempos{
@@ -79,34 +80,8 @@ int memCompartidaInicial = 2345; /*Primera dirección desde donde se compartirá
 
 int contadorC;
 
-/*Metodo para crear procesos indicados en el archivo*/
-void creacionSensores(void *arg, char *argId, char *argTipoSensor){ 
-	int i = *(int *) arg;
-	int  val = memCompartidaInicial+i ,numMin, numMax;
-	char buffPuerto[8], buffMin[4], buffMax[4];
-	numMin = 20+i;
-	numMax = 80-i;
-
-	sprintf(buffPuerto,"%d",val);
-	sprintf(buffMin,"%d",numMin);
-	sprintf(buffMax,"%d",numMax);
-
-	char *sensor = "./sx";
-	char *argv[9];
-	argv[0] = "./sx";
-	argv[1] = argId;
-	argv[2] = argTipoSensor;
-	argv[3] = buffPuerto;
-	argv[4] = "1000";
-	argv[5] = buffMin;
-	argv[6] = buffMax;
-	argv[7] = "1";
-	argv[8] = NULL;
-	execvp(sensor,argv);
-}
-
 /*Metodo para leer los datos en otro proceso por medio de memoria compartida con los procesos de sensores y realizar los cálculos respectivos. Los resultados escriben en un archivo*/
-void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int tiempo){
+void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int argPuerto, int tiempo){
 
 	struct Tiempos datosCalculos = {0, 0, 0, 0, 0};
 
@@ -135,7 +110,7 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 	datosCalculos.id=atoi(argId);
 	datosCalculos.tipoSensor=atoi(argTipoSensor);
 
-	if ((shmid = shmget(comm, SHMSZ,  0666)) < 0) {
+	if ((shmid = shmget(argPuerto, SHMSZ,  0666)) < 0) {
 		perror("shmget");
 		return(1);
 	}
@@ -314,10 +289,8 @@ void calculos(int sensoresIngresados){
 	msgid = msgget(key, 0666 | IPC_CREAT); 
 
 	for(int k = 0; k <=sensoresIngresados; k++){
-		// msgrcv to receive message
-		msgrcv(msgid, &mensajeRecibido, sizeof(mensajeRecibido), 1, 0); 
+		msgrcv(msgid, &mensajeRecibido, sizeof(mensajeRecibido), 1, 0); /*Recibe mensajes de la cola*/
 
-		// display the message 
 		//printf("Datos recibidos por Calculos : %s \n", mensajeRecibido.textoMensaje);
 		ptr = strtok(mensajeRecibido.textoMensaje, ",");
 		datosCalculos.id=atoi(ptr);
@@ -443,10 +416,12 @@ void calculos(int sensoresIngresados){
 		}
 		msgsnd(msgidB, &mensajeB, sizeof(mensajeB), 0);
 		strcpy(mensajeB.textoMensaje,"");
-	}	
-	// to destroy the message queue 
-	msgctl(msgid, IPC_RMID, NULL); 
+	}
+	msgctl(msgid, IPC_RMID, NULL); /*Destruir cola de mensajes*/
 }
+
+
+
 
 int main(int argc, char *argv[]){
 
@@ -497,7 +472,7 @@ int main(int argc, char *argv[]){
 
 	FILE *fp = NULL;                                                            
 	int i = 0, j, controlProcesos = 0;                                                                  
-	struct formato var = {NULL, NULL, 0};                                
+	struct formato var = {NULL, NULL, 0, 0};                                
 	char line[SIZE] = {0}, *ptr = NULL;
 
 	if (NULL == (fp = fopen(archivo,"r"))){ /*Lectura del archivo ingresado por la consola*/
@@ -521,26 +496,17 @@ int main(int argc, char *argv[]){
 				var.tipoSensor = ptr;
 			else if(i==2)
 				var.threshold = atoi(ptr);
+			else if(i==3)
+				var.puerto = atoi(ptr);
 		}
 		i = 0;
-		pid_t cpidCrear, cpidLeer; 
-		cpidCrear = fork(); /*Creacion de procesos para generar datos*/
-		if(cpidCrear == -1){
-			perror("fork");
-			exit(EXIT_FAILURE);
-		} else if (cpidCrear == 0){
-			usleep(controlProcesos*1000);
-			creacionSensores(&controlProcesos, var.id, var.tipoSensor);
-			exit(0);
-		} 
-
+		pid_t cpidLeer;
 		cpidLeer = fork(); /*Creacion de procesos para leer datos y trabajar con ellos*/
 		if(cpidLeer == -1){
 			perror("fork");
 			exit(EXIT_FAILURE);
 		} else if (cpidLeer == 0){
-			sleep(1);
-			lecturaSensores(&controlProcesos, var.id, var.tipoSensor, var.threshold, tiempo);
+			lecturaSensores(&controlProcesos, var.id, var.tipoSensor, var.threshold, var.puerto, tiempo);
 			exit(0);
 		}
 		controlProcesos++;

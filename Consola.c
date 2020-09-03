@@ -59,21 +59,21 @@ int main(int argc, char *argv[]){
 			bool opcionA = true;
 			printw("Seleccionó la opción A, presione *Enter* para ejecutar o X para salir\n");
 			/*Memoria compartida para validar opcion A*/
-			int shmid,*shm;
-			if ((shmid = shmget(commA, SHMSZ, IPC_CREAT | 0666)) < 0) {
+			int shmidA,*shmA;
+			if ((shmidA = shmget(commA, SHMSZ, IPC_CREAT | 0666)) < 0) {
 				perror("shmget");
 				return(1);
 			}
-			if ((shm = shmat(shmid, NULL, 0)) == (int *) -1) {
+			if ((shmA = shmat(shmidA, NULL, 0)) == (int *) -1) {
 				perror("shmat");
 				return(1);
 			}
 			if (getch() == 'x') {
 				printw("Usted ha presionado X, presione *Enter* para salir\n");
-				*shm=0;
+				*shmA=0;
 				opcionA=false;
 			}
-			*shm=1;
+			*shmA=1;
 			refresh();
 			while(opcionA){
 				nodelay(stdscr, TRUE); /* Para ejecutar sin interrupciones */
@@ -81,22 +81,18 @@ int main(int argc, char *argv[]){
 				int msgid; 
 
 				key = ftok("proyectoA", 102); /*ftok para generar una unica llave*/
-
-				
 				msgid = msgget(key, 0666 | IPC_CREAT); /*msgget crear cola de mensajes y regresar identificador*/
-				for(int k = 0; k<=9;k++){
-					msgrcv(msgid, &mensajeA, sizeof(mensajeA), 1, 0);
-					printw("%s \n",mensajeA.textoMensaje);
-				}
+				msgrcv(msgid, &mensajeA, sizeof(mensajeA), 1, 0);
+				printw("%s \n",mensajeA.textoMensaje);
 				if (getch() == 'x') {
 					printw("Usted ha presionado X, presione *Enter* para salir\n");
-					*shm=0;
+					*shmA=0;
 					opcionA=false;
 				}
 				refresh();			/* Actualizar pantalla */
 				msgctl(msgid, IPC_RMID, NULL);  /* Eliminar cola de mensajes*/
 			}
-			close(shmid);
+			close(shmidA);
 
 		}else if(ch==98){
 			bool opcionB = true;
@@ -164,11 +160,8 @@ int main(int argc, char *argv[]){
 				int msgid; 
 				key = ftok("proyectoC", 104); /*ftok para generar una unica llave*/
 				msgid=msgget(key, 0666 | IPC_CREAT); /*msgget crear cola de mensajes y regresar identificador*/
-				
-				for(int k = 0; k<=9;k++){
-					msgrcv(msgid, &mensajeC, sizeof(mensajeC), 1, 0);
-					printw("%s \n",mensajeC.textoMensaje);
-				}
+				msgrcv(msgid, &mensajeC, sizeof(mensajeC), 1, 0);
+				printw("%s \n",mensajeC.textoMensaje);
 				if (getch() == 'x') {
 					printw("Usted ha presionado X, presione *Enter* para salir\n");
 					*shmC=0;
