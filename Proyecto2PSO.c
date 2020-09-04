@@ -68,7 +68,7 @@ struct mesg_bufferB { /*Buffer para IPC de la opción B*/
 
 struct mesg_bufferC { /*Buffer para IPC de la opción C*/
 	long tipoMensaje; 
-	char textoMensaje[512]; 
+	char textoMensaje[2048]; 
 } mensajeC; 
 
 struct mesg_buffer_end { /*Buffer para IPC para almacenar valores en calculos()*/
@@ -119,20 +119,13 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 		return(1);
 	}
 	while(1){
-		if (*shm==-1){
-			printf("Sensor %s detenido\n",argId);
-			close(shmid);
-			break;
-		}
 
 		/*Cola de mensajes para opción A*/
 		if ((shmidA = shmget(7788, SHMSZ,  0666)) < 0) {
 			perror("shmget");
-			return(1);
 		}
 		if ((shmA = shmat(shmidA, NULL, 0)) == (int *) -1) {
 			perror("shmat");
-			return(1);
 		}
 		if(*shmA==1){
 			char valor[5];
@@ -153,25 +146,15 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 		/*Cola de mensajes para opción C*/
 		if ((shmidC = shmget(7700, SHMSZ,  0666)) < 0) {
 			perror("shmget");
-			return(1);
 		}
 		if ((shmC = shmat(shmidC, NULL, 0)) == (int *) -1) {
 			perror("shmat");
-			return(1);
 		}
 		if(*shmC==1){
 			char anioC[5];
 			char mesC[5];
 			char diaC[5];
 			char idPro[5];
-			int controlValor;
-			if(*shm!=controlValor){
-				controlValor=*shm;
-				contadorC = 0;
-			}else{
-				contadorC++;
-			}
-			controlValor = *shm;
 			time_t t = time(NULL);
   			struct tm tm = *localtime(&t);
 			key_t keyC; 
@@ -181,7 +164,7 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 			mensajeC.tipoMensaje = 1;
 			strcat(mensajeC.textoMensaje,"Sensor ");
 			strcat(mensajeC.textoMensaje,argId);
-			if(contadorC<5){
+			if(*shm!=-1){
 				strcat(mensajeC.textoMensaje," -- Activo --");
 			}else{
 				strcat(mensajeC.textoMensaje," -- Inactivo --");
@@ -382,11 +365,9 @@ void calculos(int sensoresIngresados){
 	int shmidB, *shmB;
 	if ((shmidB = shmget(7799, SHMSZ,  0666)) < 0) {
 		perror("shmget");
-		return(1);
 	}
 	if ((shmB = shmat(shmidB, NULL, 0)) == (int *) -1) {
 		perror("shmat");
-		return(1);
 	}
 	if(*shmB==1){
 		key_t keyB; 
@@ -431,15 +412,22 @@ int main(int argc, char *argv[]){
         	return 0; 
     	}
 
+	int tiempo = atoi(argv[1]);
+	char *archivo = argv[2];
+
+	FILE *fp = NULL; 
+	FILE *fpNL = NULL;                                                           
+	int i = 0, j, controlProcesos = 0, numeroLineas = 0;                                                                
+	struct formato var = {NULL, NULL, 0, 0};                                
+	char line[SIZE] = {0}, *ptr = NULL;
+
 	/*Memoria compartida para opcion A*/
 	int shmidA,*shmA;
 	if ((shmidA = shmget(7788, SHMSZ, IPC_CREAT | 0666)) < 0) {
 		perror("shmget");
-		return(1);
 	}
 	if ((shmA = shmat(shmidA, NULL, 0)) == (int *) -1) {
 		perror("shmat");
-		return(1);
 	}
 	*shmA=0;
 
@@ -447,11 +435,9 @@ int main(int argc, char *argv[]){
 	int shmidB,*shmB;
 	if ((shmidB = shmget(7799, SHMSZ, IPC_CREAT | 0666)) < 0) {
 		perror("shmget");
-		return(1);
 	}
 	if ((shmB = shmat(shmidB, NULL, 0)) == (int *) -1) {
 		perror("shmat");
-		return(1);
 	}
 	*shmB=0;
 
@@ -459,21 +445,12 @@ int main(int argc, char *argv[]){
 	int shmidC,*shmC;
 	if ((shmidC = shmget(7700, SHMSZ, IPC_CREAT | 0666)) < 0) {
 		perror("shmget");
-		return(1);
 	}
 	if ((shmC = shmat(shmidC, NULL, 0)) == (int *) -1) {
 		perror("shmat");
-		return(1);
 	}
 	*shmC=0;
 
-	int tiempo = atoi(argv[1]);
-	char *archivo = argv[2];
-
-	FILE *fp = NULL;                                                            
-	int i = 0, j, controlProcesos = 0;                                                                  
-	struct formato var = {NULL, NULL, 0, 0};                                
-	char line[SIZE] = {0}, *ptr = NULL;
 
 	if (NULL == (fp = fopen(archivo,"r"))){ /*Lectura del archivo ingresado por la consola*/
 		perror("Error");
@@ -483,6 +460,25 @@ int main(int argc, char *argv[]){
 	var.id = malloc(SIZE);
 	var.tipoSensor = malloc(SIZE);
 
+	/*Enviar tamaño del archivo a la consola*/
+	if (NULL == (fpNL = fopen(archivo,"r"))){
+		perror("Error");
+		exit(EXIT_FAILURE);
+	}
+	while(EOF != fscanf(fpNL, "%s",line)){
+		numeroLineas++;
+	}
+	fclose(fpNL);
+
+	/*Memoria compartida para enviar el tamaño del archivo*/
+	int shmidSF,*shmSF;
+	if ((shmidSF = shmget(7777, SHMSZ, IPC_CREAT | 0666)) < 0) {
+		perror("shmget");
+	}
+	if ((shmSF = shmat(shmidSF, NULL, 0)) == (int *) -1) {
+		perror("shmat");
+	}
+	*shmSF=numeroLineas;
 
 	while(EOF != fscanf(fp, "%s",line)){
 		ptr = strtok(line, ",");
