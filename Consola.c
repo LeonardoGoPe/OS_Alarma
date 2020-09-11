@@ -45,21 +45,11 @@ int main(int argc, char *argv[]){
 		keypad(stdscr, TRUE);		
 		noecho();			
 		scrollok(stdscr, TRUE);
-		cbreak();
 		printw("\n********Seleccione la opción que desea ejecutar********\n");
 		printw("A) Datos que llegan desde cada uno de los sensores\n");
 		printw("B) Reglas que se cumplen y el estado de la alarma\n");
 		printw("C) Ver información de diagnóstico de sensor\n");
 		printw("D) Salir\n");
-		
-		/*Recibir el tamaño del archivo*/
-		int shmidSF,*shmSF;
-		if ((shmidSF = shmget(7777, SHMSZ,  0666)) < 0) {
-			perror("shmget");
-		}
-		if ((shmSF = shmat(shmidSF, NULL, 0)) == (int *) -1) {
-			perror("shmat");
-		}
 
 		printw("Por favor seleccione la opción que desea ejecutar: \n");
 		ch = getch();
@@ -91,7 +81,7 @@ int main(int argc, char *argv[]){
 
 				key = ftok("proyectoA", 102); /*ftok para generar una unica llave*/
 				msgid = msgget(key, 0666 | IPC_CREAT); /*msgget crear cola de mensajes y regresar identificador*/
-				for(int i=0;i<*shmSF;i++){
+				for(int i=0;i<11;i++){
 					msgrcv(msgid, &mensajeA, sizeof(mensajeA), 1, 0);
 					printw("%s \n",mensajeA.textoMensaje);
 				}
@@ -170,8 +160,8 @@ int main(int argc, char *argv[]){
 				int msgid; 
 				key = ftok("proyectoC", 104); /*ftok para generar una unica llave*/
 				msgid=msgget(key, 0666 | IPC_CREAT); /*msgget crear cola de mensajes y regresar identificador*/
-				for(int i=0;i<*shmSF;i++){
-					msgrcv(msgid, &mensajeC, sizeof(mensajeC), 1, 0);
+				for(int i=0;i<11;i++){
+					ssize_t f = msgrcv(msgid, &mensajeC, sizeof(mensajeC), 1, 0);
 					printw("%s \n",mensajeC.textoMensaje);
 				}
 				if (getch() == 'x') {

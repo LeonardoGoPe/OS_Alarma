@@ -247,7 +247,7 @@ void lecturaSensores(void *arg, char *argId, char *argTipoSensor, int argTh, int
 }
 
 
-/*Metodo que realiza los procesos para determinar si se enciende o no la alarma. Se lee el archivo generado*/
+/*Metodo que realiza los procesos para determinar si se enciende o no la alarma*/
 void calculos(int sensoresIngresados){
 	int i = 0;
 	int isSenCoop=0, numSenCoop=0;
@@ -256,10 +256,10 @@ void calculos(int sensoresIngresados){
 
 	struct valoresSensores datosCalculos = {0, 0, 0.0, 0.0, 0, 0};
 
-	struct sen_format s1 = {0,0.0,(float)MAX_SIZE,0,1};
-	struct sen_format s2 = {0,0.0,(float)MAX_SIZE,0,1};
-	struct sen_format s3 = {0,0.0,(float)MAX_SIZE,0,1};
-	struct sen_format s4 = {0,0.0,(float)MAX_SIZE,0,1};
+	struct sen_format s1 = {0,0.0,(float)MAX_SIZE,0,0};
+	struct sen_format s2 = {0,0.0,(float)MAX_SIZE,0,0};
+	struct sen_format s3 = {0,0.0,(float)MAX_SIZE,0,0};
+	struct sen_format s4 = {0,0.0,(float)MAX_SIZE,0,0};
 
 	key_t key; 
 	int msgid; 
@@ -333,17 +333,17 @@ void calculos(int sensoresIngresados){
 			}
 		}
 	}
-	if((float)s1.media < (float)s1.threshold){
-		s1.encendida=0;
+	if((float)s1.media > (float)s1.threshold){
+		s1.encendida=1;
 	}
-	if((float)s2.media < (float)s2.threshold){
-		s2.encendida=0;
+	if((float)s2.media > (float)s2.threshold){
+		s2.encendida=1;
 	}
-	if((float)s3.media < (float)s3.threshold){
-		s3.encendida=0;
+	if((float)s3.media > (float)s3.threshold){
+		s3.encendida=1;
 	}
-	if((float)s4.media < (float)s4.threshold){
-		s4.encendida=0;
+	if((float)s4.media > (float)s4.threshold){
+		s4.encendida=1;
 	}
 	if(numSenCoop==0){
 		senCoop=0;
@@ -421,7 +421,7 @@ int main(int argc, char *argv[]){
 	struct formato var = {NULL, NULL, 0, 0};                                
 	char line[SIZE] = {0}, *ptr = NULL;
 
-	/*Memoria compartida para opcion A*/
+	/*Memoria compartida para opcion A, sirve para sincronizar opciones*/
 	int shmidA,*shmA;
 	if ((shmidA = shmget(7788, SHMSZ, IPC_CREAT | 0666)) < 0) {
 		perror("shmget");
@@ -431,7 +431,7 @@ int main(int argc, char *argv[]){
 	}
 	*shmA=0;
 
-	/*Memoria compartida para opcion B*/
+	/*Memoria compartida para opcion B, sirve para sincronizar opciones*/
 	int shmidB,*shmB;
 	if ((shmidB = shmget(7799, SHMSZ, IPC_CREAT | 0666)) < 0) {
 		perror("shmget");
@@ -441,7 +441,7 @@ int main(int argc, char *argv[]){
 	}
 	*shmB=0;
 
-	/*Memoria compartida para opcion C*/
+	/*Memoria compartida para opcion C, sirve para sincronizar opciones*/
 	int shmidC,*shmC;
 	if ((shmidC = shmget(7700, SHMSZ, IPC_CREAT | 0666)) < 0) {
 		perror("shmget");
@@ -459,26 +459,6 @@ int main(int argc, char *argv[]){
 
 	var.id = malloc(SIZE);
 	var.tipoSensor = malloc(SIZE);
-
-	/*Enviar tamaño del archivo a la consola*/
-	if (NULL == (fpNL = fopen(archivo,"r"))){
-		perror("Error");
-		exit(EXIT_FAILURE);
-	}
-	while(EOF != fscanf(fpNL, "%s",line)){
-		numeroLineas++;
-	}
-	fclose(fpNL);
-
-	/*Memoria compartida para enviar el tamaño del archivo*/
-	int shmidSF,*shmSF;
-	if ((shmidSF = shmget(7777, SHMSZ, IPC_CREAT | 0666)) < 0) {
-		perror("shmget");
-	}
-	if ((shmSF = shmat(shmidSF, NULL, 0)) == (int *) -1) {
-		perror("shmat");
-	}
-	*shmSF=numeroLineas;
 
 	while(EOF != fscanf(fp, "%s",line)){
 		ptr = strtok(line, ",");

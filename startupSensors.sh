@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Esquema del Sensor: id tipoSensor puerto tiempo inicial final 1
+# Esquema del Sensor: id tipoSensor puerto tiempo valor_minimo valor_maximo 1(para que no imprima)
 #
 #competing sensors
 ./sensorx 1 2 2378 1000 30 80 1  &
@@ -10,6 +10,7 @@
 ./sensorx 6 2 8873 1000 42 96 1  &
 ./sensorx 10 3 2234 1000 30 45 1  &
 ./sensorx 12 2 9081 1000 23 98 1  &
+./sensorx 22 4 9951 1000 22 98 1  &
 #complementary sensors
 ./sensorx 8 34 6732 1000 14 25 1  &
 ./sensorx 14 18 7123 1000 29 68 1  &
